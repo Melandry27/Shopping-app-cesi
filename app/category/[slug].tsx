@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   StyleSheet,
@@ -10,88 +11,72 @@ import {
 } from "react-native";
 import { CartContext } from "../../context/CartContext";
 
-const products = {
-  sweat: [
-    {
-      name: "Sweat Noir",
-      image: "https://via.placeholder.com/150/000000/FFFFFF/?text=Sweat+Noir",
-    },
-    {
-      name: "Sweat Blanc",
-      image: "https://via.placeholder.com/150/FFFFFF/000000/?text=Sweat+Blanc",
-    },
-    {
-      name: "Sweat Bleu",
-      image: "https://via.placeholder.com/150/0000FF/FFFFFF/?text=Sweat+Bleu",
-    },
-  ],
-  tshirt: [
-    {
-      name: "T-shirt Rouge",
-      image:
-        "https://via.placeholder.com/150/FF0000/FFFFFF/?text=T-shirt+Rouge",
-    },
-    {
-      name: "T-shirt Vert",
-      image: "https://via.placeholder.com/150/00FF00/FFFFFF/?text=T-shirt+Vert",
-    },
-    {
-      name: "T-shirt Jaune",
-      image:
-        "https://via.placeholder.com/150/FFFF00/000000/?text=T-shirt+Jaune",
-    },
-  ],
-  pantalon: [
-    {
-      name: "Jean Slim",
-      image: "https://via.placeholder.com/150/808080/FFFFFF/?text=Jean+Slim",
-    },
-    {
-      name: "Jogging",
-      image: "https://via.placeholder.com/150/000000/FFFFFF/?text=Jogging",
-    },
-    {
-      name: "Pantalon Cargo",
-      image:
-        "https://via.placeholder.com/150/654321/FFFFFF/?text=Pantalon+Cargo",
-    },
-  ],
-  chaussure: [
-    {
-      name: "Nike Air",
-      image: "https://via.placeholder.com/150/FF5733/FFFFFF/?text=Nike+Air",
-    },
-    {
-      name: "Adidas Superstar",
-      image:
-        "https://via.placeholder.com/150/33FF57/FFFFFF/?text=Adidas+Superstar",
-    },
-    {
-      name: "Converse",
-      image: "https://via.placeholder.com/150/5733FF/FFFFFF/?text=Converse",
-    },
-  ],
-};
-
 export default function CategoryPage() {
   const { slug } = useLocalSearchParams();
   const categorySlug = Array.isArray(slug) ? slug[0] : slug;
-  const categoryProducts =
-    products[categorySlug as keyof typeof products] || [];
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const cart = useContext(CartContext);
+
+  // Fetch les produits d'une catégorie spécifique
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch(
+          `https://fakestoreapi.com/products/category/${categorySlug}`
+        );
+        if (!response.ok)
+          throw new Error("Erreur lors du chargement des produits");
+        const data = await response.json();
+        setProducts(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [categorySlug]);
+
+  // Gestion du chargement
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Chargement des produits...</Text>
+      </View>
+    );
+  }
+
+  // Gestion des erreurs
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Catégorie : {slug}</Text>
+      <Text style={styles.title}>Catégorie : {categorySlug}</Text>
       <FlatList
-        data={categoryProducts}
-        keyExtractor={(item, index) => index.toString()}
+        data={products}
+        keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => cart?.addItem(item.name)}>
-            <View style={styles.productCard} key={item.name}>
+          <TouchableOpacity onPress={() => cart?.addItem(item)}>
+            <View style={styles.productCard}>
               <Image source={{ uri: item.image }} style={styles.productImage} />
-              <Text style={styles.productName}>{item.name}</Text>
+              <Text style={styles.productName} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.productPrice}>💰 {item.price} €</Text>
+              <Text style={styles.productRating}>
+                ⭐ {item.rating.rate} ({item.rating.count})
+              </Text>
             </View>
           </TouchableOpacity>
         )}
@@ -115,11 +100,13 @@ const styles = StyleSheet.create({
   productCard: {
     backgroundColor: "white",
     borderRadius: 10,
-    padding: 2,
+    padding: 10,
     alignItems: "center",
-    margin: 20,
+    margin: 5,
+    width: 160,
+    height: 260,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
@@ -130,7 +117,34 @@ const styles = StyleSheet.create({
   },
   productName: {
     marginTop: 10,
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  productPrice: {
+    marginTop: 5,
     fontSize: 16,
     fontWeight: "bold",
+    color: "#27ae60",
+  },
+  productRating: {
+    fontSize: 14,
+    color: "#f39c12",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    color: "red",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
